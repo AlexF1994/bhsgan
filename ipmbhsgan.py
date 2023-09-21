@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-class GeneratorWassersteinSim(nn.Module):
+class GeneratorIpmSim(nn.Module):
     def __init__(self):
         super().__init__()
         self.main = nn.Sequential(
@@ -16,7 +16,7 @@ class GeneratorWassersteinSim(nn.Module):
         return self.main(input)
     
     
-class DiscriminatorWassersteinSim(nn.Module):
+class DiscriminatorIpmSim(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -32,7 +32,7 @@ class DiscriminatorWassersteinSim(nn.Module):
         return self.main(input)
     
     
-class GeneratorWassersteinMnist(nn.Module):
+class GeneratorIpmMnist(nn.Module):
 
     def __init__(self, z_dim=100, im_chan=1, hidden_dim=64):
         super().__init__()
@@ -86,7 +86,7 @@ class GeneratorWassersteinMnist(nn.Module):
         return self.gen(x)
     
     
-class DiscriminatorWassersteinMnist(nn.Module):
+class DiscriminatorIpmMnist(nn.Module):
 
     def __init__(self, im_chan=1, hidden_dim=16):
         super().__init__()

@@ -1,10 +1,12 @@
-import torch
-import numpy as np
-from time import time
-from utils import get_noise
 from dataclasses import dataclass
+from time import time
 from typing import List
+
+import numpy as np
+import torch
 import torch.nn as nn
+
+from utils import get_noise
 
 
 @dataclass()
@@ -38,7 +40,8 @@ class Trainer:
                 dataloader, 
                 get_dis_loss, 
                 get_gen_loss,
-                gradient_penalty_enabled):
+                gradient_penalty_enabled,
+                noise_dim = 1):
         
         num_epochs = self.training_params.num_epochs
         num_dis_updates = self.training_params.num_dis_updates
@@ -52,11 +55,17 @@ class Trainer:
             print('Epoch ' + str(epoch) + ' training...' , end=' ')
             start = time()
             for i, real_sample in enumerate(dataloader):
-                real_sample = torch.reshape(real_sample, (batch_size, 1))
+                if isinstance(real_sample, list):
+                    real_sample = real_sample[0]
+                batch_size = len(real_sample)
+                try:
+                    real_sample = torch.reshape(real_sample, (batch_size, 1))
+                except:
+                    pass
                 # train Discriminator
                 self.discriminator_optimizer.zero_grad()
                 # sample noise as generator input
-                noise = get_noise(batch_size, 1)
+                noise = get_noise(batch_size, noise_dim)
                 # generate a batch of images
                 fake_sample = self.generator(noise)
                 # Adversarial loss
@@ -149,3 +158,13 @@ def get_gradient(discriminator, real_numbers, fake):
         
     )[0]
     return gradient
+
+
+def get_gen_loss_ipm(fake_scores):
+    gen_loss = torch.mean(fake_scores)
+    return gen_loss
+
+
+def get_dis_loss_ipm(real_scores, fake_scores):
+    dis_loss = torch.mean(real_scores) - torch.mean(fake_scores)
+    return dis_loss
