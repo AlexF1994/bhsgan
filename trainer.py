@@ -145,8 +145,8 @@ def get_gradient_penalty(gradient):
     return penalty
 
 
-def get_gradient(discriminator, real_numbers, fake):
-    epsilon = torch.rand(1)
+def get_gradient(discriminator, real_numbers, fake, device):
+    epsilon = torch.rand(1, device=device)
     mixed_numbers = (real_numbers * epsilon + fake * (1 - epsilon)).requires_grad_(True)
 
     mixed_scores = discriminator(mixed_numbers)
@@ -154,7 +154,7 @@ def get_gradient(discriminator, real_numbers, fake):
     gradient = torch.autograd.grad(
         inputs=mixed_numbers,
         outputs=mixed_scores,
-        grad_outputs=torch.ones_like(mixed_scores, requires_grad=False), 
+        grad_outputs=torch.ones_like(mixed_scores, requires_grad=False, device=device), 
         create_graph=True,
         retain_graph=True,
         
