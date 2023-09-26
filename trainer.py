@@ -19,10 +19,11 @@ class TrainingParams:
     
 
 class Trainer:
-    def __init__(self, training_params, generator, discriminator):
+    def __init__(self, training_params, generator, discriminator, device="cpu"):
         self.training_params = training_params
-        self.generator = generator
-        self.discriminator = discriminator
+        self.generator = generator.to(device)
+        self.discriminator = discriminator.to(device)
+        self.device = device
         self.discriminator_optimizer = self._init_dis_optimizer(training_params)
         self.generator_optimizer = self._init_dis_optimizer(training_params)
         
@@ -57,6 +58,7 @@ class Trainer:
             for i, real_sample in enumerate(dataloader):
                 if isinstance(real_sample, list):
                     real_sample = real_sample[0]
+                real_sample.to(self.device)
                 batch_size = len(real_sample)
                 try:
                     real_sample = torch.reshape(real_sample, (batch_size, 1))
@@ -65,7 +67,7 @@ class Trainer:
                 # train Discriminator
                 self.discriminator_optimizer.zero_grad()
                 # sample noise as generator input
-                noise = get_noise(batch_size, noise_dim)
+                noise = get_noise(batch_size, noise_dim, self.device)
                 # generate a batch of images
                 fake_sample = self.generator(noise)
                 # Adversarial loss

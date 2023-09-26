@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 def get_device() -> str:
     return (
-        "cuda"
+        "cuda:0"
         if torch.cuda.is_available()
         else "cpu"
         )
