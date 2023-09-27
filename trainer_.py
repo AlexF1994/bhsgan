@@ -61,41 +61,39 @@ class Trainer:
                 batch_size = len(real_sample)
                 real_sample = real_sample.to(self.device)
                 # train Discriminator
-                for _ in range(num_dis_updates):
-                    self.discriminator_optimizer.zero_grad()
-                    # sample noise as generator input
-                    noise = get_noise(batch_size, noise_dim, self.device)
-                    # generate a batch of images
-                    fake_sample = self.generator(noise)
-                    # Adversarial loss
-                    real_scores = self.discriminator(real_sample)
-                    fake_scores = self.discriminator(fake_sample.detach())
-                    if gradient_penalty_enabled:
-                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), self.device)
-                        gradient_penalty = get_gradient_penalty(gradient)
-                        discriminator_loss = get_dis_loss(real_scores, fake_scores, gradient_penalty)
-                    else:
-                        discriminator_loss = get_dis_loss(real_scores, fake_scores)
-                    tmp_d_losses.append(discriminator_loss.item())
-                    discriminator_loss.backward(retain_graph=True)
-                    self.discriminator_optimizer.step()
-                # train the generator every num_dis_updates iterations
-                #if i % num_dis_updates == 0:
-                discriminator_losses.append(np.mean(tmp_d_losses))
-                tmp_d_losses = []
-                # train Generator
-                self.generator_optimizer.zero_grad()
-                # generate a batch of fake images
-                noise_2 = get_noise(batch_size, noise_dim, self.device)
-                fake_sample = self.generator(noise_2)
+                self.discriminator_optimizer.zero_grad()
+                # sample noise as generator input
+                noise = get_noise(batch_size, noise_dim, self.device)
+                # generate a batch of images
+                fake_sample = self.generator(noise)
                 # Adversarial loss
-                fake_scores = self.discriminator(fake_sample)
-                generator_loss = get_gen_loss(fake_scores)
-                generator_losses.append(generator_loss.item())
-                generator_loss.backward()
-                self.generator_optimizer.step()
+                real_scores = self.discriminator(real_sample)
+                fake_scores = self.discriminator(fake_sample.detach())
+                if gradient_penalty_enabled:
+                    gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), self.device)
+                    gradient_penalty = get_gradient_penalty(gradient)
+                    discriminator_loss = get_dis_loss(real_scores, fake_scores, gradient_penalty)
+                else:
+                    discriminator_loss = get_dis_loss(real_scores, fake_scores)
+                tmp_d_losses.append(discriminator_loss.item())
+                discriminator_loss.backward(retain_graph=True)
+                self.discriminator_optimizer.step()
+                # train the generator every num_dis_updates iterations
+                if i % num_dis_updates == 0:
+                    discriminator_losses.append(np.mean(tmp_d_losses))
+                    tmp_d_losses = []
+                    # train Generator
+                    self.generator_optimizer.zero_grad()
+                    # generate a batch of fake images
+                    noise_2 = get_noise(batch_size, noise_dim, self.device)
+                    fake_sample = self.generator(noise_2)
+                    # Adversarial loss
+                    fake_scores = self.discriminator(fake_sample)
+                    generator_loss = get_gen_loss(fake_scores)
+                    generator_losses.append(generator_loss.item())
+                    generator_loss.backward()
+                    self.generator_optimizer.step()
                 batches_done += 1
-                print('step %.f' % i, end='\r')
             end = time()
             elapsed = end - start
             print('done, took %.1f seconds.' % elapsed)
