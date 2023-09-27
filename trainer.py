@@ -50,56 +50,87 @@ class Trainer:
         
         generator_losses = []
         discriminator_losses = []
-        tmp_d_losses = []
-        batches_done = 0
+        dis_mean_losses = []
+        gen_mean_losses = []
+        total_steps = 0
+        
         for epoch in range(num_epochs):
-            print('Epoch ' + str(epoch) + ' training...' , end=' ')
+            print('Epoch ' + str(epoch) + ' start training...' , end='\n')
+            current_step = 0
             start = time()
-            for i, real_sample in enumerate(dataloader):
+            for real_sample, _ in dataloader:
                 if isinstance(real_sample, list):
                     real_sample = real_sample[0]
-                real_sample.to(self.device)
                 batch_size = len(real_sample)
                 try:
                     real_sample = torch.reshape(real_sample, (batch_size, 1))
                 except:
                     pass
-                # train Discriminator
-                self.discriminator_optimizer.zero_grad()
-                # sample noise as generator input
-                noise = get_noise(batch_size, noise_dim, self.device)
-                # generate a batch of images
-                fake_sample = self.generator(noise)
-                # Adversarial loss
-                real_scores = self.discriminator(real_sample)
-                fake_scores = self.discriminator(fake_sample.detach())
-                if gradient_penalty_enabled:
-                    gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach())
-                    gradient_penalty = get_gradient_penalty(gradient)
-                    discriminator_loss = get_dis_loss(real_scores, fake_scores, gradient_penalty)
-                else:
-                    discriminator_loss = get_dis_loss(real_scores, fake_scores)
-                tmp_d_losses.append(discriminator_loss.item())
-                discriminator_loss.backward(retain_graph=True)
-                self.discriminator_optimizer.step()
-                # train the generator every num_dis_updates iterations
-                if i % num_dis_updates == 0:
-                    discriminator_losses.append(np.mean(tmp_d_losses))
-                    tmp_d_losses = []
-                    # train Generator
-                    self.generator_optimizer.zero_grad()
-                    # generate a batch of fake images
+                mean_iteration_dis_loss = 0
+                for _ in range(num_dis_updates):
+                    ### Update discriminator ###
+                    self.discriminator_optimizer.zero_grad()
+                    noise = get_noise(batch_size, noise_dim, device=self.device)
                     fake_sample = self.generator(noise)
-                    # Adversarial loss
-                    fake_scores = self.discriminator(fake_sample)
-                    generator_loss = get_gen_loss(fake_scores)
-                    generator_losses.append(generator_loss.item())
-                    generator_loss.backward()
-                    self.generator_optimizer.step()
-                batches_done += 1
-            end = time()
-            elapsed = end - start
-            print('done, took %.1f seconds.' % elapsed)
+                    fake_score = self.discriminator(fake_sample.detach())
+                    real_score = self.discriminator(real_sample)
+                    
+                    if gradient_penalty_enabled:
+                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), self.device)
+                        gradient_penalty = get_gradient_penalty(gradient)
+                        discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
+                    else:
+                        discriminator_loss = get_dis_loss(real_score, fake_score)
+
+                    # Keep track of the average discriminator loss in this batch
+                    mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
+                    # Update gradients
+                    discriminator_loss.backward(retain_graph=True)
+                    # Update optimizer
+                    self.discriminator_optimizer.step()
+                discriminator_losses += [mean_iteration_dis_loss]
+
+                ### Update generator ###
+                self.generator_optimizer.zero_grad()
+                noise_2 = get_noise(batch_size, noise_dim, device=self.device)
+                fake_2 = self.generator(noise_2)
+                fake_score = self.discriminator(fake_2)
+                
+                gen_loss = get_gen_loss(fake_score)
+                gen_loss.backward()
+
+                # Update the weights
+                self.generator_optimizer.step()
+
+                # Keep track of the average generator loss
+                generator_losses += [gen_loss.item()]
+                
+                current_step += 1
+                total_steps += 1
+                
+                print_val = f"Epoch: {epoch}/{num_epochs} Steps:{current_step}/{len(dataloader)}\n"
+                print_val += f"Epoch_Run_Time: {(time()-start):.6f}\n"
+                print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\n"
+                print_val += f"Loss_G : {gen_loss:.6f}\n"  
+                print(print_val, end='\r',flush = True)
+                print("*******************************\n")
+
+            gen_loss_mean = sum(generator_losses[-current_step:]) / current_step
+            dis_loss_mean = sum(discriminator_losses[-current_step:]) / current_step
+            
+            dis_mean_losses.append(dis_loss_mean)
+            gen_mean_losses.append(gen_loss_mean)
+            
+            print_val = f"Epoch: {epoch}/{num_epochs} Total Steps:{total_steps}\n"
+            print_val += f"Total_Time : {(time() - start):.6f}\n"
+            print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\n"
+            print_val += f"Loss_G : {gen_loss:.6f}\n"
+            print_val += f"Loss_C_Mean : {dis_loss_mean:.6f}\n"
+            print_val += f"Loss_G_Mean : {gen_loss_mean:.6f}\n"
+            print(print_val)
+            print("----------------------------------------------\n")
+            
+            current_step = 0
             
         return TrainedGan(self.discriminator, self.generator, discriminator_losses, generator_losses)
 
@@ -132,7 +163,7 @@ def get_gen_loss_wasserstein(fake_scores):
 
 
 def get_dis_loss_wasserstein(real_scores, fake_scores, gradient_penalty):
-    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 0.01 * gradient_penalty
+    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 10 * gradient_penalty
     return dis_loss
 
 
@@ -146,15 +177,15 @@ def get_gradient_penalty(gradient):
 
 
 def get_gradient(discriminator, real_numbers, fake, device):
-    epsilon = torch.rand(1, device=device)
-    mixed_numbers = (real_numbers * epsilon + fake * (1 - epsilon)).requires_grad_(True)
+    epsilon = torch.rand(len(real_numbers), 1, 1, 1, device=device, requires_grad=True)
+    mixed_numbers = (real_numbers * epsilon + fake * (1 - epsilon))
 
     mixed_scores = discriminator(mixed_numbers)
     
     gradient = torch.autograd.grad(
         inputs=mixed_numbers,
         outputs=mixed_scores,
-        grad_outputs=torch.ones_like(mixed_scores, requires_grad=False, device=device), 
+        grad_outputs=torch.ones_like(mixed_scores, device=device), 
         create_graph=True,
         retain_graph=True,
         
