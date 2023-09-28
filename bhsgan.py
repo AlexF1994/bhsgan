@@ -78,7 +78,7 @@ class GeneratorBhsMnist(nn.Module):
     def get_generator_final_block(self, input_channel, output_channel, kernel_size, stride = 1, padding = 0):
         return  nn.Sequential(
                 nn.ConvTranspose2d(input_channel, output_channel, kernel_size, stride, padding),
-                nn.Tanh()
+                nn.Sigmoid()
             )
     
     

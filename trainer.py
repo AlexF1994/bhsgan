@@ -11,10 +11,12 @@ from utils import get_noise
 
 @dataclass()
 class TrainingParams:
-    lr : float
+    lr_dis: float
+    lr_gen: float
     beta_1: float
     num_epochs: int
     num_dis_updates: int
+    num_gen_updates: int
     batch_size: int
     
 
@@ -25,15 +27,15 @@ class Trainer:
         self.discriminator = discriminator.to(device)
         self.device = device
         self.discriminator_optimizer = self._init_dis_optimizer(training_params)
-        self.generator_optimizer = self._init_dis_optimizer(training_params)
+        self.generator_optimizer = self._init_gen_optimizer(training_params)
         
     def _init_dis_optimizer(self, training_params):
-        lr = training_params.lr
+        lr = training_params.lr_dis
         beta_1 = training_params.beta_1
         return torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(beta_1, 0.999))
     
     def _init_gen_optimizer(self, training_params):
-        lr = training_params.lr
+        lr = training_params.lr_gen
         beta_1 = training_params.beta_1
         return torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(beta_1, 0.999))
 
@@ -46,6 +48,7 @@ class Trainer:
         
         num_epochs = self.training_params.num_epochs
         num_dis_updates = self.training_params.num_dis_updates
+        num_gen_updates = self.training_params.num_gen_updates
         batch_size = self.training_params.batch_size
         
         generator_losses = []
@@ -61,11 +64,12 @@ class Trainer:
             for real_sample, _ in dataloader:
                 if isinstance(real_sample, list):
                     real_sample = real_sample[0]
+                real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
-                try:
-                    real_sample = torch.reshape(real_sample, (batch_size, 1))
-                except:
-                    pass
+                #try:
+                #    real_sample = torch.reshape(real_sample, (batch_size, 1))
+                #except:
+                #    pass
                 mean_iteration_dis_loss = 0
                 for _ in range(num_dis_updates):
                     ### Update discriminator ###
@@ -76,7 +80,8 @@ class Trainer:
                     real_score = self.discriminator(real_sample)
                     
                     if gradient_penalty_enabled:
-                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), self.device)
+                        epsilon = torch.rand(len(real_score), 1, 1, 1, device=self.device, requires_grad=True)
+                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon, self.device)
                         gradient_penalty = get_gradient_penalty(gradient)
                         discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
                     else:
@@ -90,30 +95,33 @@ class Trainer:
                     self.discriminator_optimizer.step()
                 discriminator_losses += [mean_iteration_dis_loss]
 
-                ### Update generator ###
-                self.generator_optimizer.zero_grad()
-                noise_2 = get_noise(batch_size, noise_dim, device=self.device)
-                fake_2 = self.generator(noise_2)
-                fake_score = self.discriminator(fake_2)
-                
-                gen_loss = get_gen_loss(fake_score)
-                gen_loss.backward()
+                mean_iteration_gen_loss = 0
+                for _ in range(num_gen_updates):
+                    ### Update generator ###
+                    self.generator_optimizer.zero_grad()
+                    noise_2 = get_noise(batch_size, noise_dim, device=self.device)
+                    fake_2 = self.generator(noise_2)
+                    fake_score = self.discriminator(fake_2)
+                    
+                    gen_loss = get_gen_loss(fake_score)
+                    gen_loss.backward()
 
-                # Update the weights
-                self.generator_optimizer.step()
+                    # Update the weights
+                    self.generator_optimizer.step()
 
-                # Keep track of the average generator loss
-                generator_losses += [gen_loss.item()]
+                    # Keep track of the average generator loss
+                    mean_iteration_gen_loss += gen_loss.item() / num_gen_updates
+                    
+                generator_losses += [mean_iteration_gen_loss]
                 
                 current_step += 1
                 total_steps += 1
                 
-                print_val = f"Epoch: {epoch}/{num_epochs} Steps:{current_step}/{len(dataloader)}\n"
-                print_val += f"Epoch_Run_Time: {(time()-start):.6f}\n"
-                print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\n"
-                print_val += f"Loss_G : {gen_loss:.6f}\n"  
+                print_val = f"Epoch: {epoch}/{num_epochs} Steps:{current_step}/{len(dataloader)}\t"
+                print_val += f"Epoch_Run_Time: {(time()-start):.6f}\t"
+                print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\t"
+                print_val += f"Loss_G : {mean_iteration_gen_loss :.6f}\t"  
                 print(print_val, end='\r',flush = True)
-                print("*******************************\n")
 
             gen_loss_mean = sum(generator_losses[-current_step:]) / current_step
             dis_loss_mean = sum(discriminator_losses[-current_step:]) / current_step
@@ -124,7 +132,7 @@ class Trainer:
             print_val = f"Epoch: {epoch}/{num_epochs} Total Steps:{total_steps}\n"
             print_val += f"Total_Time : {(time() - start):.6f}\n"
             print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\n"
-            print_val += f"Loss_G : {gen_loss:.6f}\n"
+            print_val += f"Loss_G : {mean_iteration_gen_loss:.6f}\n"
             print_val += f"Loss_C_Mean : {dis_loss_mean:.6f}\n"
             print_val += f"Loss_G_Mean : {gen_loss_mean:.6f}\n"
             print(print_val)
@@ -144,26 +152,26 @@ class TrainedGan:
 
 
 def get_gen_loss_bhs(fake_scores):
-    gen_loss = torch.mean(get_conjugate_score(fake_scores))
+    gen_loss = -1. * torch.mean(get_conjugate_score(fake_scores))
     return gen_loss
 
 
 def get_dis_loss_bhs(real_scores, fake_scores):
-    dis_loss = -torch.mean(real_scores) + torch.mean(get_conjugate_score(fake_scores))
+    dis_loss = torch.mean(get_conjugate_score(fake_scores)) - torch.mean(real_scores)
     return dis_loss
 
 
 def get_conjugate_score(scores):
-    return 2 * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
+    return 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
     
 
 def get_gen_loss_wasserstein(fake_scores):
-    gen_loss = -1 * torch.mean(fake_scores)
+    gen_loss = -1. * torch.mean(fake_scores)
     return gen_loss
 
 
 def get_dis_loss_wasserstein(real_scores, fake_scores, gradient_penalty):
-    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 10 * gradient_penalty
+    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 10. * gradient_penalty
     return dis_loss
 
 
@@ -176,8 +184,7 @@ def get_gradient_penalty(gradient):
     return penalty
 
 
-def get_gradient(discriminator, real_numbers, fake, device):
-    epsilon = torch.rand(len(real_numbers), 1, 1, 1, device=device, requires_grad=True)
+def get_gradient(discriminator, real_numbers, fake, epsilon,  device):
     mixed_numbers = (real_numbers * epsilon + fake * (1 - epsilon))
 
     mixed_scores = discriminator(mixed_numbers)
@@ -194,10 +201,10 @@ def get_gradient(discriminator, real_numbers, fake, device):
 
 
 def get_gen_loss_ipm(fake_scores):
-    gen_loss = torch.mean(fake_scores)
+    gen_loss = -1. * torch.mean(fake_scores)
     return gen_loss
 
 
 def get_dis_loss_ipm(real_scores, fake_scores):
-    dis_loss = torch.mean(real_scores) - torch.mean(fake_scores)
+    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 10 * torch.var(torch.cat(real_scores, fake_scores))
     return dis_loss
