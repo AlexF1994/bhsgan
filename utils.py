@@ -57,6 +57,6 @@ class ActivationFunction(nn.Module):
         self.config = {"name": self.name}
 
 
-class Exp(ActivationFunction):
+class Positive(ActivationFunction):
     def forward(self, x):
-        return torch.exp(x)
+        return torch.abs(x)

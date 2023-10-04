@@ -165,7 +165,8 @@ def get_dis_loss_bhs(real_scores, fake_scores):
 
 
 def get_conjugate_score(scores):
-    return 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
+    conjugate_score = 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
+    return conjugate_score * (conjugate_score <= 5000) + scores * (conjugate_score > 5000)
     
 
 def get_gen_loss_wasserstein(fake_scores):

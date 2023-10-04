@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from utils import Exp
+from utils import Positive
 
 class GeneratorBhsSim(nn.Module):
     def __init__(self):
@@ -112,7 +112,7 @@ class DiscriminatorBhsMnist(nn.Module):
     def get_critic_final_block(self, input_dim, output_dim):
         return  nn.Sequential(
                 nn.Linear(input_dim, output_dim),
-                Exp()
+                Positive()
             )
     
     def forward(self, image):
