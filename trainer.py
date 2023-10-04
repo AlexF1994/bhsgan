@@ -44,13 +44,13 @@ class Trainer:
                 get_dis_loss, 
                 get_gen_loss,
                 gradient_penalty_enabled,
-                flatten_dim = None,
-                noise_dim = 1):
+                flatten_dim = None):
         
         num_epochs = self.training_params.num_epochs
         num_dis_updates = self.training_params.num_dis_updates
         num_gen_updates = self.training_params.num_gen_updates
         batch_size = self.training_params.batch_size
+        noise_dim = self.discriminator.z_dim
         
         generator_losses = []
         discriminator_losses = []
