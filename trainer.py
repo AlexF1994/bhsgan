@@ -44,6 +44,7 @@ class Trainer:
                 get_dis_loss, 
                 get_gen_loss,
                 gradient_penalty_enabled,
+                flatten_dim = None,
                 noise_dim = 1):
         
         num_epochs = self.training_params.num_epochs
@@ -58,12 +59,14 @@ class Trainer:
         total_steps = 0
         
         for epoch in range(num_epochs):
-            print('Epoch ' + str(epoch) + ' start training...' , end='\n')
+            print('Epoch ' + str(epoch + 1) + ' start training...' , end='\n')
             current_step = 0
             start = time()
             for real_sample, _ in dataloader:
                 if isinstance(real_sample, list):
                     real_sample = real_sample[0]
+                if flatten_dim:
+                    real_sample = real_sample.view(-1, flatten_dim)
                 real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
                 #try:
@@ -80,7 +83,7 @@ class Trainer:
                     real_score = self.discriminator(real_sample)
                     
                     if gradient_penalty_enabled:
-                        epsilon = torch.rand(len(real_score), 1, 1, 1, device=self.device, requires_grad=True)
+                        epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
                         gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon, self.device)
                         gradient_penalty = get_gradient_penalty(gradient)
                         discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
@@ -117,7 +120,7 @@ class Trainer:
                 current_step += 1
                 total_steps += 1
                 
-                print_val = f"Epoch: {epoch}/{num_epochs} Steps:{current_step}/{len(dataloader)}\t"
+                print_val = f"Epoch: {epoch + 1}/{num_epochs} Steps:{current_step}/{len(dataloader)}\t"
                 print_val += f"Epoch_Run_Time: {(time()-start):.6f}\t"
                 print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\t"
                 print_val += f"Loss_G : {mean_iteration_gen_loss :.6f}\t"  
@@ -129,7 +132,7 @@ class Trainer:
             dis_mean_losses.append(dis_loss_mean)
             gen_mean_losses.append(gen_loss_mean)
             
-            print_val = f"Epoch: {epoch}/{num_epochs} Total Steps:{total_steps}\n"
+            print_val = f"Epoch: {epoch + 1}/{num_epochs} Total Steps:{total_steps}\n"
             print_val += f"Total_Time : {(time() - start):.6f}\n"
             print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\n"
             print_val += f"Loss_G : {mean_iteration_gen_loss:.6f}\n"
@@ -206,5 +209,5 @@ def get_gen_loss_ipm(fake_scores):
 
 
 def get_dis_loss_ipm(real_scores, fake_scores):
-    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 10 * torch.var(torch.cat(real_scores, fake_scores))
+    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 0.1 * torch.var(torch.cat(real_scores, fake_scores))
     return dis_loss

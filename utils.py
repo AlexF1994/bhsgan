@@ -48,3 +48,15 @@ def plot_losses(generator_losses, discriminator_losses):
     plt.ylabel("Loss")
     plt.legend()
     plt.show()
+    
+    
+class ActivationFunction(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.name = self.__class__.__name__
+        self.config = {"name": self.name}
+
+
+class Exp(ActivationFunction):
+    def forward(self, x):
+        return torch.exp(x)
