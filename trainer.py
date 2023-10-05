@@ -210,5 +210,5 @@ def get_gen_loss_ipm(fake_scores):
 
 
 def get_dis_loss_ipm(real_scores, fake_scores):
-    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 0.1 * torch.var(torch.cat(real_scores, fake_scores))
+    dis_loss = torch.mean(fake_scores) - torch.mean(real_scores) + 0.1 * torch.var(real_scores)
     return dis_loss
