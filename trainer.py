@@ -50,7 +50,7 @@ class Trainer:
         num_dis_updates = self.training_params.num_dis_updates
         num_gen_updates = self.training_params.num_gen_updates
         batch_size = self.training_params.batch_size
-        noise_dim = self.discriminator.z_dim
+        noise_dim = self.generator.z_dim
         
         generator_losses = []
         discriminator_losses = []
