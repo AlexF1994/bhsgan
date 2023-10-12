@@ -165,7 +165,11 @@ def get_dis_loss_bhs(real_scores, fake_scores):
 
 
 def get_conjugate_score(scores):
+    #print(f"scores: {scores}")
     conjugate_score = 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
+    bool_mask_nan = torch.isnan(conjugate_score)
+    conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
+    conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
     return conjugate_score * (conjugate_score <= 5000) + scores * (conjugate_score > 5000)
     
 
