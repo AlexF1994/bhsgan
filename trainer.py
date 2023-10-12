@@ -170,7 +170,7 @@ def get_conjugate_score(scores):
     bool_mask_nan = torch.isnan(conjugate_score)
     conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
     conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
-    return conjugate_score * (conjugate_score <= 5000) + scores * (conjugate_score > 5000)
+    return conjugate_score * (conjugate_score <= 25000) + scores * (conjugate_score > 25000)
     
 
 def get_gen_loss_wasserstein(fake_scores):
