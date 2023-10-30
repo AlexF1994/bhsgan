@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from utils import Positive, TanhScale, ReLUn
+from utils import Positive, TanhScale
 
 
 class GeneratorBhsSim(nn.Module):
@@ -108,6 +108,7 @@ class DiscriminatorBhsMnist(nn.Module):
                 #nn.BatchNorm1d(output_dim),
                 #nn.ELU(inplace=True)
                 #TanhScale()
+                nn.ReLU(inplace=True)
                 #nn.LeakyReLU(inplace=True)
 
         )

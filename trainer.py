@@ -67,6 +67,7 @@ class Trainer:
                     real_sample = real_sample[0]
                 if flatten_dim:
                     real_sample = real_sample.view(-1, flatten_dim)
+                noise = get_noise(batch_size, noise_dim, device=self.device)
                 real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
                 #try:
@@ -77,7 +78,6 @@ class Trainer:
                 for _ in range(num_dis_updates):
                     ### Update discriminator ###
                     self.discriminator_optimizer.zero_grad()
-                    noise = get_noise(batch_size, noise_dim, device=self.device)
                     fake_sample = self.generator(noise)
                     fake_score = self.discriminator(fake_sample.detach())
                     real_score = self.discriminator(real_sample)
@@ -105,8 +105,7 @@ class Trainer:
                 for _ in range(num_gen_updates):
                     ### Update generator ###
                     self.generator_optimizer.zero_grad()
-                    noise_2 = get_noise(batch_size, noise_dim, device=self.device)
-                    fake_2 = self.generator(noise_2)
+                    fake_2 = self.generator(noise)
                     fake_score = self.discriminator(fake_2)
                     
                     gen_loss = get_gen_loss(fake_score)
@@ -127,7 +126,7 @@ class Trainer:
                 print_val += f"Epoch_Run_Time: {(time()-start):.6f}\t"
                 print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\t"
                 print_val += f"Loss_G : {mean_iteration_gen_loss :.6f}\t"  
-                print(print_val, end='\r',flush = True)
+                # print(print_val, end='\r',flush = True)
 
             gen_loss_mean = sum(generator_losses[-current_step:]) / current_step
             dis_loss_mean = sum(discriminator_losses[-current_step:]) / current_step

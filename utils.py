@@ -63,4 +63,4 @@ class Positive(ActivationFunction):
 
 class TanhScale(ActivationFunction):
     def forward(self,x):
-        return 10*torch.tanh(x)
+        return 4*torch.tanh(x)
