@@ -81,7 +81,9 @@ class Trainer:
                     fake_sample = self.generator(noise)
                     fake_score = self.discriminator(fake_sample.detach())
                     real_score = self.discriminator(real_sample)
-                    
+                   # print(f"fake_score: {torch.mean(fake_score)}")
+                   # print("=========================")
+                   # print(f"real_score: {torch.mean(real_score)}")
                     if gradient_penalty_enabled:
                         epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
                         gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon, self.device)
@@ -94,6 +96,7 @@ class Trainer:
                     mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
                     # Update gradients
                     discriminator_loss.backward(retain_graph=True)
+                    #print(torch.norm(self.discriminator.main[3][0].weight.grad))
                     # Update optimizer
                     self.discriminator_optimizer.step()
                 discriminator_losses += [mean_iteration_dis_loss]
@@ -167,10 +170,11 @@ def get_dis_loss_bhs(real_scores, fake_scores):
 def get_conjugate_score(scores):
     #print(f"scores: {scores}")
     conjugate_score = 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
-    bool_mask_nan = torch.isnan(conjugate_score)
-    conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
-    conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
-    return conjugate_score * (conjugate_score <= 25000) + scores * (conjugate_score > 25000)
+    return conjugate_score
+   # bool_mask_nan = torch.isnan(conjugate_score)
+   # conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
+   # conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
+   # return conjugate_score * (conjugate_score <= 10) + scores * (conjugate_score > 10)
     
 
 def get_gen_loss_wasserstein(fake_scores):

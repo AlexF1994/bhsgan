@@ -1,6 +1,7 @@
 import torch.nn as nn
 
-from utils import Positive
+from utils import Positive, TanhScale, ReLUn
+
 
 class GeneratorBhsSim(nn.Module):
     def __init__(self):
@@ -81,7 +82,7 @@ class GeneratorBhsMnist(nn.Module):
     
 class DiscriminatorBhsMnist(nn.Module):
 
-    def __init__(self, input_dim=1, hidden_dim=1024):
+    def __init__(self, input_dim=1, hidden_dim=784):
         super().__init__()
         self.main = nn.Sequential(
             self.get_critic_block(input_dim,
@@ -105,7 +106,10 @@ class DiscriminatorBhsMnist(nn.Module):
         return nn.Sequential(
                 nn.Linear(input_dim, output_dim),
                 #nn.BatchNorm1d(output_dim),
-                nn.ELU(inplace=True)
+                #nn.ELU(inplace=True)
+                #TanhScale()
+                #nn.LeakyReLU(inplace=True)
+
         )
     
     
