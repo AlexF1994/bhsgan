@@ -106,10 +106,7 @@ class DiscriminatorBhsMnist(nn.Module):
         return nn.Sequential(
                 nn.Linear(input_dim, output_dim),
                 #nn.BatchNorm1d(output_dim),
-                #nn.ELU(inplace=True)
-                #TanhScale()
-                nn.ReLU(inplace=True)
-                #nn.LeakyReLU(inplace=True)
+                nn.ELU(inplace=True)
 
         )
     

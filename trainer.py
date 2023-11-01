@@ -74,32 +74,7 @@ class Trainer:
                 #    real_sample = torch.reshape(real_sample, (batch_size, 1))
                 #except:
                 #    pass
-                mean_iteration_dis_loss = 0
-                for _ in range(num_dis_updates):
-                    ### Update discriminator ###
-                    self.discriminator_optimizer.zero_grad()
-                    fake_sample = self.generator(noise)
-                    fake_score = self.discriminator(fake_sample.detach())
-                    real_score = self.discriminator(real_sample)
-                   # print(f"fake_score: {torch.mean(fake_score)}")
-                   # print("=========================")
-                   # print(f"real_score: {torch.mean(real_score)}")
-                    if gradient_penalty_enabled:
-                        epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
-                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon, self.device)
-                        gradient_penalty = get_gradient_penalty(gradient)
-                        discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
-                    else:
-                        discriminator_loss = get_dis_loss(real_score, fake_score)
 
-                    # Keep track of the average discriminator loss in this batch
-                    mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
-                    # Update gradients
-                    discriminator_loss.backward(retain_graph=True)
-                    #print(torch.norm(self.discriminator.main[3][0].weight.grad))
-                    # Update optimizer
-                    self.discriminator_optimizer.step()
-                discriminator_losses += [mean_iteration_dis_loss]
 
                 mean_iteration_gen_loss = 0
                 for _ in range(num_gen_updates):
@@ -116,9 +91,36 @@ class Trainer:
 
                     # Keep track of the average generator loss
                     mean_iteration_gen_loss += gen_loss.item() / num_gen_updates
-                    
+
                 generator_losses += [mean_iteration_gen_loss]
-                
+
+                mean_iteration_dis_loss = 0
+                for _ in range(num_dis_updates):
+                    ### Update discriminator ###
+                    self.discriminator_optimizer.zero_grad()
+                    fake_sample = self.generator(noise)
+                    fake_score = self.discriminator(fake_sample.detach())
+                    real_score = self.discriminator(real_sample)
+                    # print(f"fake_score: {torch.mean(fake_score)}")
+                    # print("=========================")
+                    # print(f"real_score: {torch.mean(real_score)}")
+                    if gradient_penalty_enabled:
+                        epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
+                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon,
+                                                self.device)
+                        gradient_penalty = get_gradient_penalty(gradient)
+                        discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
+                    else:
+                        discriminator_loss = get_dis_loss(real_score, fake_score)
+
+                    # Keep track of the average discriminator loss in this batch
+                    mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
+                    # Update gradients
+                    discriminator_loss.backward(retain_graph=True)
+                    # print(torch.norm(self.discriminator.main[3][0].weight.grad))
+                    # Update optimizer
+                    self.discriminator_optimizer.step()
+                discriminator_losses += [mean_iteration_dis_loss]
                 current_step += 1
                 total_steps += 1
                 
