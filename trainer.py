@@ -67,43 +67,20 @@ class Trainer:
                     real_sample = real_sample[0]
                 if flatten_dim:
                     real_sample = real_sample.view(-1, flatten_dim)
+                noise = get_noise(batch_size, noise_dim, device=self.device)
                 real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
                 #try:
                 #    real_sample = torch.reshape(real_sample, (batch_size, 1))
                 #except:
                 #    pass
-                mean_iteration_dis_loss = 0
-                for _ in range(num_dis_updates):
-                    ### Update discriminator ###
-                    self.discriminator_optimizer.zero_grad()
-                    noise = get_noise(batch_size, noise_dim, device=self.device)
-                    fake_sample = self.generator(noise)
-                    fake_score = self.discriminator(fake_sample.detach())
-                    real_score = self.discriminator(real_sample)
-                    
-                    if gradient_penalty_enabled:
-                        epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
-                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon, self.device)
-                        gradient_penalty = get_gradient_penalty(gradient)
-                        discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
-                    else:
-                        discriminator_loss = get_dis_loss(real_score, fake_score)
 
-                    # Keep track of the average discriminator loss in this batch
-                    mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
-                    # Update gradients
-                    discriminator_loss.backward(retain_graph=True)
-                    # Update optimizer
-                    self.discriminator_optimizer.step()
-                discriminator_losses += [mean_iteration_dis_loss]
 
                 mean_iteration_gen_loss = 0
                 for _ in range(num_gen_updates):
                     ### Update generator ###
                     self.generator_optimizer.zero_grad()
-                    noise_2 = get_noise(batch_size, noise_dim, device=self.device)
-                    fake_2 = self.generator(noise_2)
+                    fake_2 = self.generator(noise)
                     fake_score = self.discriminator(fake_2)
                     
                     gen_loss = get_gen_loss(fake_score)
@@ -114,9 +91,36 @@ class Trainer:
 
                     # Keep track of the average generator loss
                     mean_iteration_gen_loss += gen_loss.item() / num_gen_updates
-                    
+
                 generator_losses += [mean_iteration_gen_loss]
-                
+
+                mean_iteration_dis_loss = 0
+                for _ in range(num_dis_updates):
+                    ### Update discriminator ###
+                    self.discriminator_optimizer.zero_grad()
+                    fake_sample = self.generator(noise)
+                    fake_score = self.discriminator(fake_sample.detach())
+                    real_score = self.discriminator(real_sample)
+                    # print(f"fake_score: {torch.mean(fake_score)}")
+                    # print("=========================")
+                    # print(f"real_score: {torch.mean(real_score)}")
+                    if gradient_penalty_enabled:
+                        epsilon = torch.rand(len(real_score), 1, device=self.device, requires_grad=True)
+                        gradient = get_gradient(self.discriminator, real_sample, fake_sample.detach(), epsilon,
+                                                self.device)
+                        gradient_penalty = get_gradient_penalty(gradient)
+                        discriminator_loss = get_dis_loss(real_score, fake_score, gradient_penalty)
+                    else:
+                        discriminator_loss = get_dis_loss(real_score, fake_score)
+
+                    # Keep track of the average discriminator loss in this batch
+                    mean_iteration_dis_loss += discriminator_loss.item() / num_dis_updates
+                    # Update gradients
+                    discriminator_loss.backward(retain_graph=True)
+                    # print(torch.norm(self.discriminator.main[3][0].weight.grad))
+                    # Update optimizer
+                    self.discriminator_optimizer.step()
+                discriminator_losses += [mean_iteration_dis_loss]
                 current_step += 1
                 total_steps += 1
                 
@@ -124,7 +128,7 @@ class Trainer:
                 print_val += f"Epoch_Run_Time: {(time()-start):.6f}\t"
                 print_val += f"Loss_C : {mean_iteration_dis_loss:.6f}\t"
                 print_val += f"Loss_G : {mean_iteration_gen_loss :.6f}\t"  
-                print(print_val, end='\r',flush = True)
+                # print(print_val, end='\r',flush = True)
 
             gen_loss_mean = sum(generator_losses[-current_step:]) / current_step
             dis_loss_mean = sum(discriminator_losses[-current_step:]) / current_step
@@ -167,10 +171,11 @@ def get_dis_loss_bhs(real_scores, fake_scores):
 def get_conjugate_score(scores):
     #print(f"scores: {scores}")
     conjugate_score = 2. * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
-    bool_mask_nan = torch.isnan(conjugate_score)
-    conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
-    conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
-    return conjugate_score * (conjugate_score <= 25000) + scores * (conjugate_score > 25000)
+    return conjugate_score
+   # bool_mask_nan = torch.isnan(conjugate_score)
+   # conjugate_score_wo_nan = torch.nan_to_num(conjugate_score, nan=0, posinf=1000000)
+   # conjugate_score = conjugate_score_wo_nan + scores * bool_mask_nan
+   # return conjugate_score * (conjugate_score <= 10) + scores * (conjugate_score > 10)
     
 
 def get_gen_loss_wasserstein(fake_scores):

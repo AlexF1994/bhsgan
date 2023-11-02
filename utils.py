@@ -60,3 +60,7 @@ class ActivationFunction(nn.Module):
 class Positive(ActivationFunction):
     def forward(self, x):
         return torch.abs(x)
+
+class TanhScale(ActivationFunction):
+    def forward(self,x):
+        return 4*torch.tanh(x)
