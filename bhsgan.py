@@ -82,8 +82,9 @@ class GeneratorBhsMnist(nn.Module):
     
 class DiscriminatorBhsMnist(nn.Module):
 
-    def __init__(self, input_dim=1, hidden_dim=784):
+    def __init__(self, final_activation, input_dim=1, hidden_dim=784):
         super().__init__()
+        self.final_activation = final_activation
         self.main = nn.Sequential(
             self.get_critic_block(input_dim,
                                          hidden_dim,
@@ -107,14 +108,13 @@ class DiscriminatorBhsMnist(nn.Module):
                 nn.Linear(input_dim, output_dim),
                 #nn.BatchNorm1d(output_dim),
                 nn.ELU(inplace=True)
-
         )
     
     
     def get_critic_final_block(self, input_dim, output_dim):
-        return  nn.Sequential(
+        return nn.Sequential(
                 nn.Linear(input_dim, output_dim),
-                Positive()
+                self.final_activation()
             )
     
     def forward(self, image):
