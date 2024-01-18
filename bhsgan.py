@@ -69,7 +69,6 @@ class GeneratorBhsMnist(nn.Module):
 
 
 class DiscriminatorBhsMnist(nn.Module):
-
     def __init__(self, final_activation, input_dim=1, hidden_dim=784):
         super().__init__()
         self.final_activation = final_activation
@@ -100,15 +99,12 @@ class DiscriminatorBhsMnist(nn.Module):
         )
 
     def get_critic_final_block(self, input_dim, output_dim):
-        return nn.Sequential(
-                nn.Linear(input_dim, output_dim),
-                self.final_activation()
-            )
-    
+        return nn.Sequential(nn.Linear(input_dim, output_dim), self.final_activation())
+
     def forward(self, image):
         return self.main(image)
-    
-    
+
+
 class GeneratorBhsLsun(nn.Module):
     def __init__(self, n_channels_out=3, image_size=64, z_dim=100):
         super().__init__()
@@ -190,8 +186,9 @@ class GeneratorBhsLsun(nn.Module):
 
 
 class DiscriminatorBhsLsun(nn.Module):
-    def __init__(self, n_channels_in=3, image_size=64):
+    def __init__(self, final_activation, n_channels_in=3, image_size=64):
         super().__init__()
+        self.final_activation = final_activation
         self.main = nn.Sequential(
             # input is ``(nc) x 64 x 64``
             self.get_critic_block(
@@ -258,5 +255,8 @@ class DiscriminatorBhsLsun(nn.Module):
             nn.Conv2d(
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
-            Positive(),
+            self.final_activation(),
         )
+
+    def forward(self, x):
+        return self.main(x)
