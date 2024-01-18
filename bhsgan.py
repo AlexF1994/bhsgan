@@ -178,7 +178,7 @@ class GeneratorBhsLsun(nn.Module):
             nn.ConvTranspose2d(
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
-            nn.Sigmoid()(),
+            nn.Tanh(),
         )
 
     def forward(self, x):
