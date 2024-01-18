@@ -63,8 +63,8 @@ def save_models_state_dict(trained_model, path):
     torch.save(trained_model.generator.state_dict(), gen_path)
 
 
-def load_model_state_dict(model_instance, path):
-    return model_instance.load_state_dict(torch.load(path))
+def load_model_state_dict(model_instance, path, **kwargs):
+    model_instance.load_state_dict(torch.load(path, **kwargs))
 
 
 class ActivationFunction(nn.Module):
