@@ -28,10 +28,23 @@ def init_weights(layer):
 
 
 def plot_tensor_images(
-    image_tensor, num_images=25, size=(1, 28, 28), save_fig=False, epoch=0
+    image_tensor,
+    num_images=25,
+    size=(1, 28, 28),
+    save_fig=False,
+    epoch=0,
+    unflat=True,
+    tanh_activation=False,
 ):
-    image_unflat = image_tensor.detach().cpu().view(-1, *size)
-    image_grid = make_grid(image_unflat[:num_images], nrow=8)
+    images_to_plot = image_tensor.detach().cpu()
+
+    if unflat:
+        images_to_plot = images_to_plot.view(-1, *size)
+
+    if tanh_activation:
+        images_to_plot = images_to_plot * 0.5 + 0.5
+
+    image_grid = make_grid(images_to_plot[:num_images], nrow=8)
     plt.axis("off")
     plt.imshow(image_grid.permute(1, 2, 0).squeeze())
     if save_fig:

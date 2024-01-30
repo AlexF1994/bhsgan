@@ -218,12 +218,14 @@ def get_conjugate_score_rkl(scores):
 
 
 def get_gen_loss_rkl(fake_scores):
-    gen_loss = -1.0 * torch.mean(get_conjugate_score_kl(fake_scores))
+    gen_loss = -1.0 * torch.mean(get_conjugate_score_rkl(fake_scores))
     return gen_loss
 
 
 def get_dis_loss_rkl(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_kl(fake_scores)) - torch.mean(real_scores)
+    dis_loss = torch.mean(get_conjugate_score_rkl(fake_scores)) - torch.mean(
+        real_scores
+    )
     return dis_loss
 
 
@@ -241,7 +243,9 @@ def get_gen_loss_gan(fake_scores):
 
 
 def get_dis_loss_gan(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_kl(fake_scores)) - torch.mean(real_scores)
+    dis_loss = torch.mean(get_conjugate_score_gan(fake_scores)) - torch.mean(
+        real_scores
+    )
     return dis_loss
 
 
@@ -254,12 +258,12 @@ def get_conjugate_score_p(scores):
 
 
 def get_gen_loss_p(fake_scores):
-    gen_loss = -1.0 * torch.mean(get_conjugate_score_gan(fake_scores))
+    gen_loss = -1.0 * torch.mean(get_conjugate_score_p(fake_scores))
     return gen_loss
 
 
 def get_dis_loss_p(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_kl(fake_scores)) - torch.mean(real_scores)
+    dis_loss = torch.mean(get_conjugate_score_p(fake_scores)) - torch.mean(real_scores)
     return dis_loss
 
 
