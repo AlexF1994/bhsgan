@@ -4,3 +4,7 @@ __pycache__/
 MNIST/
 Pictures/
 LSUN/
+celeba/
+_cache*
+cifar10/
+
