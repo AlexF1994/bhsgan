@@ -89,7 +89,7 @@ class ActivationFunction(nn.Module):
 
 class Positive(ActivationFunction):
     def forward(self, x):
-        return torch.abs(x)
+        return -0.999 + torch.abs(x)
 
 
 class TanhScale(ActivationFunction):
@@ -99,7 +99,7 @@ class TanhScale(ActivationFunction):
 
 class RevKlActivation(ActivationFunction):
     def forward(self, x):
-        return -torch.abs(x)
+        return -torch.exp(-x)
 
 
 class GanGanActivation(ActivationFunction):

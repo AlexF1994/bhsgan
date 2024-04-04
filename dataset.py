@@ -12,7 +12,7 @@ class SampleDataset(Dataset):
         return len(self.sample)
 
     def __getitem__(self, idx):
-        return torch.select(self.sample, 0, idx)
+        return (torch.select(self.sample, 0, idx), 1)
 
 
 class SubCIFAR10(torchvision.datasets.CIFAR10):

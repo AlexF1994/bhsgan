@@ -4,13 +4,26 @@ import torch.nn as nn
 class GeneratorWassersteinSim(nn.Module):
     def __init__(self):
         super().__init__()
+        self.z_dim = 2
         self.main = nn.Sequential(
-            nn.Linear(1, 16),
+            nn.Linear(2, 16),
             nn.ReLU(True),
-            nn.Linear(16, 8),
-            nn.ReLU(True),
-            nn.Linear(8, 1),
+            nn.Linear(16, 2),
             nn.Sigmoid(),
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+class GeneratorWassersteinSimNormal(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.z_dim = 2
+        self.main = nn.Sequential(
+            nn.Linear(2, 16),
+            nn.ReLU(True),
+            nn.Linear(16, 2),
         )
 
     def forward(self, input):
@@ -22,11 +35,9 @@ class DiscriminatorWassersteinSim(nn.Module):
         super().__init__()
 
         self.main = nn.Sequential(
-            nn.Linear(1, 16),
+            nn.Linear(2, 16),
             nn.ReLU(True),
-            nn.Linear(16, 8),
-            nn.ReLU(True),
-            nn.Linear(8, 1),
+            nn.Linear(16, 1),
         )
 
     def forward(self, input):
@@ -154,7 +165,7 @@ class GeneratorWassersteinLsun(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            )
+            ),
             # state size. ``(nc) x 64 x 64``
         )
 

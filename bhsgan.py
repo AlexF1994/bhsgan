@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch.nn.utils import weight_norm
 
 from utils import Positive, TanhScale
 
@@ -6,12 +7,11 @@ from utils import Positive, TanhScale
 class GeneratorBhsSim(nn.Module):
     def __init__(self):
         super().__init__()
+        self.z_dim = 2
         self.main = nn.Sequential(
-            nn.Linear(1, 16),
+            nn.Linear(2, 16),
             nn.ReLU(True),
-            nn.Linear(16, 8),
-            nn.ReLU(True),
-            nn.Linear(8, 1),
+            nn.Linear(16, 2),
             nn.Sigmoid(),
         )
 
@@ -19,17 +19,29 @@ class GeneratorBhsSim(nn.Module):
         return self.main(input)
 
 
-class DiscriminatorBhsSim(nn.Module):
+class GeneratorBhsSimNormal(nn.Module):
     def __init__(self):
         super().__init__()
-
+        self.z_dim = 2
         self.main = nn.Sequential(
-            nn.Linear(1, 16),
+            nn.Linear(2, 16),
             nn.ReLU(True),
-            nn.Linear(16, 8),
+            nn.Linear(16, 2),
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+class DiscriminatorBhsSim(nn.Module):
+    def __init__(self, final_activation):
+        super().__init__()
+        self.final_activation = final_activation
+        self.main = nn.Sequential(
+            nn.Linear(2, 16),
             nn.ReLU(True),
-            nn.Linear(8, 1),
-            nn.Softplus(),
+            nn.Linear(16, 1),
+            self.final_activation(),
         )
 
     def forward(self, input):
@@ -156,7 +168,7 @@ class GeneratorBhsLsun(nn.Module):
                 stride=2,
                 padding=1,
                 bias=False,
-            )
+            ),
             # state size. ``(nc) x 64 x 64``
         )
 
@@ -168,7 +180,7 @@ class GeneratorBhsLsun(nn.Module):
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
         )
 
     def get_generator_final_block(
@@ -260,3 +272,121 @@ class DiscriminatorBhsLsun(nn.Module):
 
     def forward(self, x):
         return self.main(x)
+
+
+class GeneratorBhsLsunEnhanced(nn.Module):
+    def __init__(self, n_channels_out=3, image_size=64, z_dim=100):
+        super().__init__()
+
+        self.z_dim = z_dim
+
+        self.main = nn.Sequential(
+            # input is Z, going into a convolution
+            self.get_generator_block(
+                input_channels=z_dim,
+                out_channels=image_size * 16,
+                kernel_size=4,
+                stride=1,
+                padding=0,
+                bias=False,
+            ),
+            # state size. ``(ngf*16) x 4 x 4``
+            self.get_generator_block(
+                input_channels=image_size * 16,
+                out_channels=image_size * 8,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+                bias=False,
+            ),
+            # state size. ``(ngf*8) x 8 x 8``
+            self.get_generator_block(
+                input_channels=image_size * 8,
+                out_channels=image_size * 4,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+                bias=False,
+            ),
+            # state size. ``(ngf*4) x 16 x 16``
+            self.get_generator_block(
+                input_channels=image_size * 4,
+                out_channels=image_size * 2,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+                bias=False,
+            ),
+            # state size. ``(ngf*2) x 32 x 32``
+            self.get_generator_final_block(
+                input_channels=image_size * 2,
+                out_channels=n_channels_out,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+                bias=False,
+            ),
+            # state size. ``(nc) x 64 x 64``
+        )
+
+    def get_generator_block(
+        self, input_channels, out_channels, kernel_size, stride, padding, bias
+    ):
+        return nn.Sequential(
+            nn.ConvTranspose2d(
+                input_channels, out_channels, kernel_size, stride, padding, bias=bias
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+
+    def get_generator_final_block(
+        self, input_channels, out_channels, kernel_size, stride, padding, bias
+    ):
+        return nn.Sequential(
+            nn.ConvTranspose2d(
+                input_channels, out_channels, kernel_size, stride, padding, bias=bias
+            ),
+            nn.Tanh(),
+        )
+
+    def forward(self, x):
+        return self.main(x)
+
+class DiscriminatorBhsLsunEnhanced(DiscriminatorBhsLsun):
+
+    def get_critic_block(
+        self, input_channels, out_channels, kernel_size, stride, padding, bias
+    ):
+        return nn.Sequential(
+            weight_norm(
+                nn.Conv2d(
+                    input_channels,
+                    out_channels,
+                    kernel_size,
+                    stride,
+                    padding,
+                    bias=bias,
+                )
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+            # nn.Dropout(p=0.5),
+        )
+
+    def get_critic_final_block(
+        self, input_channels, out_channels, kernel_size, stride, padding, bias
+    ):
+        return nn.Sequential(
+            weight_norm(
+                nn.Conv2d(
+                    input_channels,
+                    out_channels,
+                    kernel_size,
+                    stride,
+                    padding,
+                    bias=bias,
+                )
+            ),
+            self.final_activation(),
+        )

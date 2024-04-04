@@ -5,8 +5,9 @@ from typing import List
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils import clip_grad_value_
 
-from utils import get_noise
+from utils import get_noise, plot_tensor_images
 
 
 @dataclass()
@@ -33,7 +34,9 @@ class Trainer:
         lr = training_params.lr_dis
         beta_1 = training_params.beta_1
         return torch.optim.Adam(
-            self.discriminator.parameters(), lr=lr, betas=(beta_1, 0.999)
+            self.discriminator.parameters(),
+            lr=lr,
+            betas=(beta_1, 0.999),
         )
 
     def _init_gen_optimizer(self, training_params):
@@ -51,6 +54,7 @@ class Trainer:
         gradient_penalty_enabled,
         flatten_dim=None,
         is_color_picture=False,
+        print_intermediate=True,
     ):
         num_epochs = self.training_params.num_epochs
         num_dis_updates = self.training_params.num_dis_updates
@@ -69,6 +73,8 @@ class Trainer:
             current_step = 0
             start = time()
             for real_sample, _ in dataloader:
+                if len(list(real_sample.size())) == 1:
+                    real_sample = torch.reshape(real_sample, (batch_size, 1))
                 # print(f"batch number: {batch}")
                 if isinstance(real_sample, list):
                     real_sample = real_sample[0]
@@ -91,6 +97,7 @@ class Trainer:
                     gen_loss.backward()
 
                     # Update the weights
+                    # clip_grad_value_(self.generator.parameters(), 1000.0)
                     self.generator_optimizer.step()
 
                     # Keep track of the average generator loss
@@ -147,6 +154,7 @@ class Trainer:
                     discriminator_loss.backward(retain_graph=True)
                     # print(torch.norm(self.discriminator.main[3][0].weight.grad))
                     # Update optimizer
+                    # clip_grad_value_(self.discriminator.parameters(), 1000.0)
                     self.discriminator_optimizer.step()
                 discriminator_losses += [mean_iteration_dis_loss]
                 current_step += 1
@@ -158,8 +166,8 @@ class Trainer:
                 print_val += f"Loss_G : {mean_iteration_gen_loss :.6f}\t"
                 print(print_val, end="\r", flush=True)
                 # free up gpu disk space
-                del real_sample
-                torch.cuda.empty_cache()
+                # del real_sample
+                # torch.cuda.empty_cache()
 
             gen_loss_mean = sum(generator_losses[-current_step:]) / current_step
             dis_loss_mean = sum(discriminator_losses[-current_step:]) / current_step
@@ -177,6 +185,15 @@ class Trainer:
             print("----------------------------------------------\n")
 
             current_step = 0
+
+            if print_intermediate and (((epoch + 1) % 1) == 0):
+                test_noise = get_noise(5, noise_dim, device=self.device)
+                if is_color_picture:
+                    test_noise = torch.reshape(test_noise, (5, noise_dim, 1, 1))
+                test_images = self.generator(test_noise)
+                plot_tensor_images(
+                    test_images, num_images=5, unflat=False, tanh_activation=True
+                )
 
         return TrainedGan(
             self.discriminator, self.generator, discriminator_losses, generator_losses
@@ -238,13 +255,13 @@ def get_conjugate_score_gan(scores):
 
 
 def get_gen_loss_gan(fake_scores):
-    gen_loss = -1.0 * torch.mean(get_conjugate_score_gan(fake_scores))
+    gen_loss = -1.0 * torch.mean(torch.log(fake_scores))
     return gen_loss
 
 
 def get_dis_loss_gan(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_gan(fake_scores)) - torch.mean(
-        real_scores
+    dis_loss = -1.0 * torch.mean(torch.log(1 - fake_scores)) - torch.mean(
+        torch.log(real_scores)
     )
     return dis_loss
 
@@ -279,10 +296,13 @@ def get_dis_loss_bhs(real_scores, fake_scores):
 
 
 def get_conjugate_score(scores):
-    conjugate_score = (
-        2.0 * (-1 + torch.sqrt(1 + scores)) * torch.exp(torch.sqrt(1 + scores))
+    conjugate_score_1 = (
+        2.0 * (-1 + torch.sqrt(1 + scores)) * torch.exp(-1 + torch.sqrt(1 + scores))
     )
-    return conjugate_score
+    conjugate_score_2 = (
+        2.0 * (-1 - torch.sqrt(1 + scores)) * torch.exp(-1 - torch.sqrt(1 + scores))
+    )
+    return torch.where(torch.ge(scores, 0), conjugate_score_1, conjugate_score_2)
 
 
 def get_gen_loss_wasserstein(fake_scores):
@@ -330,4 +350,15 @@ def get_dis_loss_ipm(real_scores, fake_scores):
     dis_loss = (
         torch.mean(fake_scores) - torch.mean(real_scores) + 0.1 * torch.var(real_scores)
     )
+    return dis_loss
+
+
+## universal f-Gan
+def get_gen_loss_uf(fake_scores):
+    gen_loss = torch.norm(fake_scores, 1)
+    return gen_loss
+
+
+def get_dis_loss_uf(real_scores, fake_scores):
+    dis_loss = torch.norm(real_scores, 1)
     return dis_loss
