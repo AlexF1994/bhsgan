@@ -114,7 +114,7 @@ class DiscriminatorWassersteinMnist(nn.Module):
         return self.main(image)
 
 
-class GeneratorWassersteinLsun(nn.Module):
+class GeneratorWassersteinCifar(nn.Module):
     def __init__(self, n_channels_out=3, image_size=64, z_dim=100):
         super().__init__()
 
@@ -194,7 +194,7 @@ class GeneratorWassersteinLsun(nn.Module):
         return self.main(x)
 
 
-class DiscriminatorWassersteinLsun(nn.Module):
+class DiscriminatorWassersteinCifar(nn.Module):
     def __init__(self, n_channels_in=3, image_size=64):
         super().__init__()
         self.main = nn.Sequential(

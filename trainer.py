@@ -2,11 +2,10 @@ from dataclasses import dataclass
 from time import time
 from typing import List
 
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.utils import clip_grad_value_
 
+from fid import InceptionV3
 from utils import get_noise, plot_tensor_images
 
 
@@ -15,35 +14,53 @@ class TrainingParams:
     lr_dis: float
     lr_gen: float
     beta_1: float
+    beta_2: float
     num_epochs: int
     num_dis_updates: int
     num_gen_updates: int
     batch_size: int
+    weight_decay: float
+    lr_annealing: bool
 
 
 class Trainer:
-    def __init__(self, training_params, generator, discriminator, device="cpu"):
+    def __init__(
+        self,
+        training_params,
+        generator,
+        discriminator,
+        device="cpu",
+        calculate_fid=False,
+    ):
         self.training_params = training_params
         self.generator = generator.to(device)
         self.discriminator = discriminator.to(device)
         self.device = device
+        self.calculate_fid = calculate_fid
+        if self.calculate_fid:
+            block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+            model = InceptionV3([block_idx])
+            self.inception_model = model.to(device)
         self.discriminator_optimizer = self._init_dis_optimizer(training_params)
         self.generator_optimizer = self._init_gen_optimizer(training_params)
 
     def _init_dis_optimizer(self, training_params):
         lr = training_params.lr_dis
         beta_1 = training_params.beta_1
+        beta_2 = training_params.beta_1
+        weight_decay = training_params.weight_decay
         return torch.optim.Adam(
             self.discriminator.parameters(),
             lr=lr,
-            betas=(beta_1, 0.999),
+            betas=(beta_1, beta_2),
+            weight_decay=weight_decay,
         )
 
     def _init_gen_optimizer(self, training_params):
         lr = training_params.lr_gen
         beta_1 = training_params.beta_1
         return torch.optim.Adam(
-            self.generator.parameters(), lr=lr, betas=(beta_1, 0.999)
+            self.generator.parameters(), lr=lr, betas=(beta_1, 0.9999)
         )
 
     def train_gan(
@@ -61,6 +78,7 @@ class Trainer:
         num_gen_updates = self.training_params.num_gen_updates
         batch_size = self.training_params.batch_size
         noise_dim = self.generator.z_dim
+        use_lr_annealing = self.training_params.lr_annealing
 
         generator_losses = []
         discriminator_losses = []
@@ -82,13 +100,15 @@ class Trainer:
                     real_sample = real_sample.view(-1, flatten_dim)
                 real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
-                noise = get_noise(batch_size, noise_dim, device=self.device)
-                if is_color_picture:
-                    noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
 
                 mean_iteration_gen_loss = 0
+                # noise = get_noise(batch_size, noise_dim, device=self.device)
+
                 for _ in range(num_gen_updates):
                     ### Update generator ###
+                    noise = get_noise(batch_size, noise_dim, device=self.device)
+                    if is_color_picture:
+                        noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
                     self.generator_optimizer.zero_grad()
                     fake_2 = self.generator(noise)
                     fake_score = self.discriminator(fake_2)
@@ -106,8 +126,12 @@ class Trainer:
                 generator_losses += [mean_iteration_gen_loss]
 
                 mean_iteration_dis_loss = 0
+
                 for _ in range(num_dis_updates):
                     ### Update discriminator ###
+                    noise = get_noise(batch_size, noise_dim, device=self.device)
+                    if is_color_picture:
+                        noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
                     self.discriminator_optimizer.zero_grad()
                     fake_sample = self.generator(noise)
                     fake_score = self.discriminator(fake_sample.detach())
@@ -194,6 +218,14 @@ class Trainer:
                 plot_tensor_images(
                     test_images, num_images=5, unflat=False, tanh_activation=True
                 )
+
+            if use_lr_annealing:
+                if (epoch + 1) == 15:
+                    self.discriminator_optimizer.param_groups[0]["lr"] /= 10
+                    self.generator_optimizer.param_groups[0]["lr"] /= 10
+                if (epoch + 1) == 35:
+                    self.discriminator_optimizer.param_groups[0]["lr"] /= 10
+                    self.generator_optimizer.param_groups[0]["lr"] /= 10
 
         return TrainedGan(
             self.discriminator, self.generator, discriminator_losses, generator_losses
@@ -348,7 +380,9 @@ def get_gen_loss_ipm(fake_scores):
 
 def get_dis_loss_ipm(real_scores, fake_scores):
     dis_loss = (
-        torch.mean(fake_scores) - torch.mean(real_scores) + 0.1 * torch.var(real_scores)
+        torch.mean(fake_scores)
+        - torch.mean(real_scores)
+        + 0.1 * (torch.mean(torch.square(real_scores)))
     )
     return dis_loss
 
@@ -360,5 +394,5 @@ def get_gen_loss_uf(fake_scores):
 
 
 def get_dis_loss_uf(real_scores, fake_scores):
-    dis_loss = torch.norm(real_scores, 1)
+    dis_loss = -torch.norm(real_scores, 1) - torch.norm(fake_scores, 1)
     return dis_loss

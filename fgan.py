@@ -114,7 +114,7 @@ class DiscriminatorBhsMnist(nn.Module):
         return self.main(image)
 
 
-class GeneratorBhsCifar(nn.Module):
+class GeneratorfCifar(nn.Module):
     def __init__(self, n_channels_out=3, image_size=64, z_dim=100):
         super().__init__()
 
@@ -194,7 +194,7 @@ class GeneratorBhsCifar(nn.Module):
         return self.main(x)
 
 
-class DiscriminatorBhsCifar(nn.Module):
+class DiscriminatorfCifar(nn.Module):
     def __init__(self, final_activation, n_channels_in=3, image_size=64):
         super().__init__()
         self.final_activation = final_activation
@@ -255,7 +255,6 @@ class DiscriminatorBhsCifar(nn.Module):
             ),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(p=0.5),
         )
 
     def get_critic_final_block(

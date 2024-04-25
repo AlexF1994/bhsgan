@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
+from torch.nn import functional as F
 
 
 # https://www.kaggle.com/code/rafat97/pytorch-wasserstein-gan-wgan
@@ -89,7 +90,7 @@ class ActivationFunction(nn.Module):
 
 class Positive(ActivationFunction):
     def forward(self, x):
-        return -0.999 + torch.abs(x)
+        return -0.9999 + torch.log(1 + torch.abs(x))
 
 
 class TanhScale(ActivationFunction):
