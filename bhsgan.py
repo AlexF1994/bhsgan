@@ -254,8 +254,8 @@ class DiscriminatorBhsCifar(nn.Module):
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
             nn.BatchNorm2d(out_channels),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(p=0.5),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0),
         )
 
     def get_critic_final_block(

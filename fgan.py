@@ -177,7 +177,7 @@ class GeneratorfCifar(nn.Module):
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
             nn.BatchNorm2d(out_channels),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
         )
 
     def get_generator_final_block(

@@ -357,7 +357,7 @@ class FIDInceptionE_2(torchvision.models.inception.InceptionE):
 
 
 def calculate_activation_statistics(
-    model, dataloader=None, generator=None, dims=2048, device="cpu"
+    model, dataloader=None, generator=None, dims=2048, device="cpu", noise_dim=100
 ):
     model.eval()
     pred_arr = np.empty((50000, dims))
@@ -375,9 +375,10 @@ def calculate_activation_statistics(
             start_idx = start_idx + pred.shape[0]
 
     if generator:
-        for i in tqdm(list(range(500))):
-            noise = get_noise(100, 100, device=device)
-            noise = torch.reshape(noise, (100, 100, 1, 1))
+        n_iterations = int(50000 / noise_dim)
+        for i in tqdm(list(range(n_iterations))):
+            noise = get_noise(noise_dim, 100, device=device)
+            noise = torch.reshape(noise, (noise_dim, 100, 1, 1))
             batch = generator(noise)
             with torch.no_grad():
                 pred = model(batch)[0]
@@ -435,12 +436,14 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
 
-def calculate_frechet(dataloader, generator, model, device):
+def calculate_frechet(dataloader, generator, model, device, noise_dim=100):
     mu_1, std_1 = calculate_activation_statistics(
-        model, dataloader=dataloader, device=device
+        model,
+        dataloader=dataloader,
+        device=device,
     )
     mu_2, std_2 = calculate_activation_statistics(
-        model, generator=generator, device=device
+        model, generator=generator, device=device, noise_dim=noise_dim
     )
 
     """get fretched distance"""

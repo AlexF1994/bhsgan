@@ -88,9 +88,10 @@ class ActivationFunction(nn.Module):
         self.config = {"name": self.name}
 
 
-class Positive(ActivationFunction):
+class BhsActivation(ActivationFunction):
     def forward(self, x):
-        return -0.9999 + torch.log(1 + torch.abs(x))
+        # x = torch.where(torch.ge(x, 0), x, torch.sigmoid(x))
+        return -1 + torch.log(1 + torch.abs(x))
 
 
 class TanhScale(ActivationFunction):

@@ -100,15 +100,15 @@ class Trainer:
                     real_sample = real_sample.view(-1, flatten_dim)
                 real_sample = real_sample.to(self.device)
                 batch_size = len(real_sample)
+                noise = get_noise(batch_size, noise_dim, device=self.device)
+                if is_color_picture:
+                    noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
 
                 mean_iteration_gen_loss = 0
                 # noise = get_noise(batch_size, noise_dim, device=self.device)
 
                 for _ in range(num_gen_updates):
                     ### Update generator ###
-                    noise = get_noise(batch_size, noise_dim, device=self.device)
-                    if is_color_picture:
-                        noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
                     self.generator_optimizer.zero_grad()
                     fake_2 = self.generator(noise)
                     fake_score = self.discriminator(fake_2)
@@ -129,9 +129,6 @@ class Trainer:
 
                 for _ in range(num_dis_updates):
                     ### Update discriminator ###
-                    noise = get_noise(batch_size, noise_dim, device=self.device)
-                    if is_color_picture:
-                        noise = torch.reshape(noise, (batch_size, noise_dim, 1, 1))
                     self.discriminator_optimizer.zero_grad()
                     fake_sample = self.generator(noise)
                     fake_score = self.discriminator(fake_sample.detach())
@@ -181,6 +178,7 @@ class Trainer:
                     # clip_grad_value_(self.discriminator.parameters(), 1000.0)
                     self.discriminator_optimizer.step()
                 discriminator_losses += [mean_iteration_dis_loss]
+
                 current_step += 1
                 total_steps += 1
 
@@ -220,7 +218,7 @@ class Trainer:
                 )
 
             if use_lr_annealing:
-                if (epoch + 1) == 15:
+                if (epoch + 1) == 20:
                     self.discriminator_optimizer.param_groups[0]["lr"] /= 10
                     self.generator_optimizer.param_groups[0]["lr"] /= 10
                 if (epoch + 1) == 35:
@@ -302,7 +300,7 @@ def get_dis_loss_gan(real_scores, fake_scores):
 
 
 def get_conjugate_score_p(scores):
-    conjugate_score = 1 / 4 * torch.pow(scores, 2) + scores
+    conjugate_score = (1 / 4) * torch.pow(scores, 2) + scores
     return conjugate_score
 
 
