@@ -175,7 +175,7 @@ class Trainer:
                     discriminator_loss.backward(retain_graph=True)
                     # print(torch.norm(self.discriminator.main[3][0].weight.grad))
                     # Update optimizer
-                    # clip_grad_value_(self.discriminator.parameters(), 1000.0)
+                    # nn.utils.clip_grad_value_(self.discriminator.parameters(), 5.0)  # type: ignore
                     self.discriminator_optimizer.step()
                 discriminator_losses += [mean_iteration_dis_loss]
 
@@ -218,7 +218,7 @@ class Trainer:
                 )
 
             if use_lr_annealing:
-                if (epoch + 1) == 20:
+                if (epoch + 1) == 15:
                     self.discriminator_optimizer.param_groups[0]["lr"] /= 10
                     self.generator_optimizer.param_groups[0]["lr"] /= 10
                 if (epoch + 1) == 35:
@@ -247,12 +247,16 @@ def get_conjugate_score_kl(scores):
 
 
 def get_gen_loss_kl(fake_scores):
-    gen_loss = -1.0 * torch.mean(get_conjugate_score_kl(fake_scores))
+    gen_loss = -1.0 * torch.mean(fake_scores)
     return gen_loss
 
 
-def get_dis_loss_kl(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_kl(fake_scores)) - torch.mean(real_scores)
+def get_dis_loss_kl(real_scores, fake_scores, gradient_penalty):
+    dis_loss = (
+        torch.mean(get_conjugate_score_kl(fake_scores))
+        - torch.mean(real_scores)
+        + 10 * gradient_penalty
+    )
     return dis_loss
 
 
@@ -269,7 +273,7 @@ def get_gen_loss_rkl(fake_scores):
     return gen_loss
 
 
-def get_dis_loss_rkl(real_scores, fake_scores):
+def get_dis_loss_rkl(real_scores, fake_scores, gradient_penalty):
     dis_loss = torch.mean(get_conjugate_score_rkl(fake_scores)) - torch.mean(
         real_scores
     )
@@ -285,13 +289,15 @@ def get_conjugate_score_gan(scores):
 
 
 def get_gen_loss_gan(fake_scores):
-    gen_loss = -1.0 * torch.mean(torch.log(fake_scores))
+    eps = 0.00000001
+    gen_loss = -1.0 * torch.mean(torch.log(fake_scores + eps))
     return gen_loss
 
 
 def get_dis_loss_gan(real_scores, fake_scores):
+    eps = 0.00000001
     dis_loss = -1.0 * torch.mean(torch.log(1 - fake_scores)) - torch.mean(
-        torch.log(real_scores)
+        torch.log(real_scores + eps)
     )
     return dis_loss
 
@@ -309,28 +315,71 @@ def get_gen_loss_p(fake_scores):
     return gen_loss
 
 
-def get_dis_loss_p(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score_p(fake_scores)) - torch.mean(real_scores)
+def get_dis_loss_p(real_scores, fake_scores, gradient_penalty):
+    dis_loss = (
+        torch.mean(get_conjugate_score_p(fake_scores))
+        - torch.mean(real_scores)
+        + 20.0 * gradient_penalty
+    )
     return dis_loss
 
 
 ## BHS GAN
 def get_gen_loss_bhs(fake_scores):
-    gen_loss = -1.0 * torch.mean(get_conjugate_score(fake_scores))
+    gen_loss = -1.0 * torch.mean(fake_scores)
     return gen_loss
 
 
-def get_dis_loss_bhs(real_scores, fake_scores):
-    dis_loss = torch.mean(get_conjugate_score(fake_scores)) - torch.mean(real_scores)
+def get_dis_loss_bhs(real_scores, fake_scores, gradient_penalty):
+    dis_loss = (
+        torch.mean(get_conjugate_score(fake_scores))
+        - torch.mean(real_scores)
+        + 10 * gradient_penalty
+    )
+    return dis_loss
+
+
+def get_dis_loss_bhs_2(real_scores, fake_scores, gradient_penalty):
+    positive_real_scores = (
+        real_scores[torch.ge(real_scores, 0)]
+        if real_scores[torch.ge(real_scores, 0)].nelement() != 0
+        else torch.tensor(0.0)
+    )
+    negative_real_scores = (
+        real_scores[torch.lt(real_scores, 0)]
+        if real_scores[torch.lt(real_scores, 0)].nelement() != 0
+        else torch.tensor(0.0)
+    )
+    positive_fake_scores = (
+        fake_scores[torch.ge(fake_scores, 0)]
+        if fake_scores[torch.ge(fake_scores, 0)].nelement() != 0
+        else torch.tensor(0.0)
+    )
+    negative_fake_scores = (
+        fake_scores[torch.lt(fake_scores, 0)]
+        if fake_scores[torch.lt(fake_scores, 0)].nelement() != 0
+        else torch.tensor(0.0)
+    )
+    dis_loss = (
+        torch.mean(get_conjugate_score(fake_scores))
+        - torch.mean(positive_real_scores)
+        + torch.mean(negative_real_scores)
+        + 10.0 * gradient_penalty
+    )
     return dis_loss
 
 
 def get_conjugate_score(scores):
+    eps = 0.00001
     conjugate_score_1 = (
-        2.0 * (-1 + torch.sqrt(1 + scores)) * torch.exp(-1 + torch.sqrt(1 + scores))
+        2.0
+        * (-1 + torch.sqrt(1 + scores + eps))
+        * torch.exp(-1 + torch.sqrt(1 + scores + eps))
     )
     conjugate_score_2 = (
-        2.0 * (-1 - torch.sqrt(1 + scores)) * torch.exp(-1 - torch.sqrt(1 + scores))
+        2.0
+        * (-1 - torch.sqrt(1 + scores + eps))
+        * torch.exp(-1 - torch.sqrt(1 + scores + eps))
     )
     return torch.where(torch.ge(scores, 0), conjugate_score_1, conjugate_score_2)
 
@@ -371,6 +420,28 @@ def get_gradient(discriminator, real_numbers, fake, epsilon, device):
     return gradient
 
 
+def get_second_gradient(discriminator, real_numbers, fake, epsilon, device):
+    mixed_numbers = real_numbers * epsilon + fake * (1 - epsilon)
+
+    mixed_scores = discriminator(mixed_numbers)
+
+    gradient = torch.autograd.grad(
+        inputs=mixed_numbers,
+        outputs=mixed_scores,
+        grad_outputs=torch.ones_like(mixed_scores, device=device),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    gradient_2 = torch.autograd.grad(
+        inputs=gradient,
+        outputs=mixed_scores,
+        grad_outputs=torch.ones_like(mixed_scores, device=device),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    return gradient_2
+
+
 def get_gen_loss_ipm(fake_scores):
     gen_loss = -1.0 * torch.mean(fake_scores)
     return gen_loss
@@ -380,17 +451,19 @@ def get_dis_loss_ipm(real_scores, fake_scores):
     dis_loss = (
         torch.mean(fake_scores)
         - torch.mean(real_scores)
-        + 0.1 * (torch.mean(torch.square(real_scores)))
+        + 0.1 * (torch.mean(torch.square(fake_scores)))
     )
     return dis_loss
 
 
 ## universal f-Gan
 def get_gen_loss_uf(fake_scores):
-    gen_loss = torch.norm(fake_scores, 1)
+    gen_loss = torch.mean(fake_scores)
     return gen_loss
 
 
-def get_dis_loss_uf(real_scores, fake_scores):
-    dis_loss = -torch.norm(real_scores, 1) - torch.norm(fake_scores, 1)
+def get_dis_loss_uf(real_scores, fake_scores, gradient_penalty):
+    dis_loss = (
+        -torch.mean(fake_scores) + torch.mean(real_scores) + 10.0 * gradient_penalty
+    )
     return dis_loss

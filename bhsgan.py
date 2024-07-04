@@ -200,7 +200,7 @@ class DiscriminatorBhsCifar(nn.Module):
         self.final_activation = final_activation
         self.main = nn.Sequential(
             # input is ``(nc) x 64 x 64``
-            self.get_critic_block(
+            self.get_critic_first_block(
                 input_channels=n_channels_in,
                 out_channels=image_size,
                 kernel_size=4,
@@ -246,6 +246,18 @@ class DiscriminatorBhsCifar(nn.Module):
             ),
         )
 
+    def get_critic_first_block(
+        self, input_channels, out_channels, kernel_size, stride, padding, bias
+    ):
+        return nn.Sequential(
+            nn.Conv2d(
+                input_channels, out_channels, kernel_size, stride, padding, bias=bias
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(p=0),
+        )
+
     def get_critic_block(
         self, input_channels, out_channels, kernel_size, stride, padding, bias
     ):
@@ -254,7 +266,7 @@ class DiscriminatorBhsCifar(nn.Module):
                 input_channels, out_channels, kernel_size, stride, padding, bias=bias
             ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(p=0),
         )
 

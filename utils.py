@@ -90,8 +90,7 @@ class ActivationFunction(nn.Module):
 
 class BhsActivation(ActivationFunction):
     def forward(self, x):
-        # x = torch.where(torch.ge(x, 0), x, torch.sigmoid(x))
-        return -1 + torch.log(1 + torch.abs(x))
+        return -1 + torch.exp(x)
 
 
 class TanhScale(ActivationFunction):
@@ -107,3 +106,8 @@ class RevKlActivation(ActivationFunction):
 class GanGanActivation(ActivationFunction):
     def forward(self, x):
         return -torch.log(1 + torch.exp(-x))
+
+
+class UniversalActivation(ActivationFunction):
+    def forward(self, x):
+        return torch.exp(x)
