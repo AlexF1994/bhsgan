@@ -1,5 +1,7 @@
 import torch.nn as nn
 
+from utils import UniversalActivation
+
 
 class GeneratorBhsSim(nn.Module):
     def __init__(self):
@@ -19,11 +21,9 @@ class GeneratorBhsSim(nn.Module):
 class GeneratorBhsSimNormal(nn.Module):
     def __init__(self):
         super().__init__()
-        self.z_dim = 2
+        self.z_dim = 1
         self.main = nn.Sequential(
-            nn.Linear(2, 16),
-            nn.ReLU(True),
-            nn.Linear(16, 2),
+            nn.Linear(1, 8), nn.ReLU(True), nn.Linear(8, 1), UniversalActivation()
         )
 
     def forward(self, input):
@@ -35,7 +35,7 @@ class DiscriminatorBhsSim(nn.Module):
         super().__init__()
         self.final_activation = final_activation
         self.main = nn.Sequential(
-            nn.Linear(2, 16),
+            nn.Linear(1, 16),
             nn.ReLU(True),
             nn.Linear(16, 1),
             self.final_activation(),

@@ -31,6 +31,7 @@ class Trainer:
         discriminator,
         device="cpu",
         calculate_fid=False,
+        f_gamma=False,
     ):
         self.training_params = training_params
         self.generator = generator.to(device)
@@ -43,6 +44,11 @@ class Trainer:
             self.inception_model = model.to(device)
         self.discriminator_optimizer = self._init_dis_optimizer(training_params)
         self.generator_optimizer = self._init_gen_optimizer(training_params)
+        self.f_gamma = f_gamma
+        self.v = 0
+        if self.f_gamma:
+            self.v = torch.tensor(0.5)
+            self.v_optimizer = self._init_v_optimizer()
 
     def _init_dis_optimizer(self, training_params):
         lr = training_params.lr_dis
@@ -62,6 +68,9 @@ class Trainer:
         return torch.optim.Adam(
             self.generator.parameters(), lr=lr, betas=(beta_1, 0.9999)
         )
+
+    def _init_v_optimizer(self):
+        return torch.optim.Adam(self.v)
 
     def train_gan(
         self,
@@ -114,6 +123,7 @@ class Trainer:
                     fake_score = self.discriminator(fake_2)
 
                     gen_loss = get_gen_loss(fake_score)
+                    # gen_loss.clamp(min=-100, max=100)
                     gen_loss.backward()
 
                     # Update the weights
@@ -164,6 +174,7 @@ class Trainer:
                         discriminator_loss = get_dis_loss(
                             real_score, fake_score, gradient_penalty
                         )
+                        discriminator_loss.clamp(min=-200, max=200)
                     else:
                         discriminator_loss = get_dis_loss(real_score, fake_score)
 
@@ -319,7 +330,7 @@ def get_dis_loss_p(real_scores, fake_scores, gradient_penalty):
     dis_loss = (
         torch.mean(get_conjugate_score_p(fake_scores))
         - torch.mean(real_scores)
-        + 20.0 * gradient_penalty
+        + 10.0 * gradient_penalty
     )
     return dis_loss
 
@@ -370,7 +381,7 @@ def get_dis_loss_bhs_2(real_scores, fake_scores, gradient_penalty):
 
 
 def get_conjugate_score(scores):
-    eps = 0.00001
+    eps = 0.0000001
     conjugate_score_1 = (
         2.0
         * (-1 + torch.sqrt(1 + scores + eps))
@@ -401,7 +412,9 @@ def get_gradient_penalty(gradient):
 
     gradient_norm = gradient.norm(2, dim=1)
 
-    penalty = torch.mean((gradient_norm - 1) ** 2)
+    penalty = torch.mean(
+        torch.maximum(gradient_norm**2 - 1, torch.zeros_like(gradient_norm))
+    )
     return penalty
 
 
