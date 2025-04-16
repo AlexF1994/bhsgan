@@ -23,11 +23,15 @@ class GeneratorBhsSimNormal(nn.Module):
         super().__init__()
         self.z_dim = 1
         self.main = nn.Sequential(
-            nn.Linear(1, 8), nn.ReLU(True), nn.Linear(8, 1), UniversalActivation()
+            nn.Linear(1, 8),
+            nn.ReLU(True),
+            nn.Linear(8, 1),
+            UniversalActivation()
         )
 
     def forward(self, input):
         return self.main(input)
+
 
 
 class DiscriminatorBhsSim(nn.Module):
